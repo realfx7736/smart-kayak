@@ -3,7 +3,8 @@ const cors = require('cors');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const admin = require('firebase-admin');
-require('dotenv').config({ path: '../.env' }); // Adjust if shared .env is in root
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 // --- 1. Initialize Firebase Admin ---
 // Recommended: Download your serviceAccountKey.json from Firebase Console -> Project Settings -> Service accounts
@@ -28,10 +29,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const razorpay = new Razorpay({
-    key_id: process.env.VITE_RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+const k_id = process.env.VITE_RAZORPAY_KEY_ID;
+const k_sec = process.env.RAZORPAY_KEY_SECRET;
+
+let razorpay;
+if (k_id && k_sec && !k_id.includes('placeholder')) {
+    razorpay = new Razorpay({ key_id: k_id, key_secret: k_sec });
+} else {
+    console.warn('⚠️ Razorpay keys missing. Using mock mode.');
+    razorpay = { orders: { create: (opt) => ({ id: 'mock_' + Date.now(), ...opt }) } };
+}
 
 // --- 2. Razorpay Order Creation ---
 app.post('/api/create-order', async (req, res) => {
