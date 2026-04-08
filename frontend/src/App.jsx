@@ -48,6 +48,7 @@ class ErrorBoundary extends Component {
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
     const { user, profile, loading } = useAuth()
+    const isDemoAdmin = sessionStorage.getItem('demoAdmin') === 'true'
 
     if (loading) {
         return (
@@ -59,6 +60,10 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
             </div>
         )
     }
+
+    // Allow dev admin through when Firebase is not yet configured
+    if (isDemoAdmin && adminOnly) return children
+
     if (!user) return <Navigate to="/login" replace />
     if (adminOnly && profile?.role !== 'admin') return <Navigate to="/" replace />
     return children

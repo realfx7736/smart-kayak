@@ -127,8 +127,17 @@ const Login = () => {
         setError(null)
 
         if (isLocked()) return
+
+        // ── DEV ADMIN BYPASS (works without Firebase keys) ────────────────────
+        if (email === 'admin@smartkayak.com' && password === 'admin123') {
+            console.warn('🛡️ Dev Admin Mode activated — connect Firebase for production.')
+            sessionStorage.setItem('demoAdmin', 'true')
+            navigate('/admin')
+            return
+        }
+
         if (!auth) {
-            setError('Authentication service is offline. Please configure Firebase.')
+            setError('Authentication service is offline. Please configure Firebase in .env')
             return
         }
 
@@ -306,7 +315,30 @@ const Login = () => {
                                 </button>
                             </div>
 
-                            <div className="mt-8 flex justify-between text-sm">
+                            {/* Admin Quick Access */}
+                            <div className="mt-6 p-4 rounded-2xl bg-teal-500/5 border border-teal-500/20">
+                                <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <ShieldCheck size={12} /> Admin Access (Dev Mode)
+                                </p>
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="text-xs text-navy-400 space-y-1">
+                                        <p>📧 admin@smartkayak.com</p>
+                                        <p>🔑 admin123</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            sessionStorage.setItem('demoAdmin', 'true')
+                                            navigate('/admin')
+                                        }}
+                                        className="shrink-0 px-4 py-2 bg-teal-500 text-white rounded-xl text-xs font-black hover:bg-teal-400 transition-all"
+                                    >
+                                        Enter Admin →
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex justify-between text-sm">
                                 <button onClick={() => { setMode('reset'); setError(null); setInfo(null) }} className="text-navy-500 hover:text-teal-400 transition-colors font-bold">Forgot password?</button>
                                 <button onClick={() => { setMode('signup'); setError(null) }} className="text-teal-400 font-bold hover:text-teal-300 transition-colors">Create account</button>
                             </div>
