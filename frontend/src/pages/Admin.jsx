@@ -1,24 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { db } from '../lib/firebase'
+import { db, storage } from '../lib/firebase'
 import {
-    collection,
-    query,
-    orderBy,
-    onSnapshot,
-    updateDoc,
-    deleteDoc,
-    doc,
-    addDoc,
-    setDoc,
-    serverTimestamp
+    collection, query, orderBy, onSnapshot,
+    updateDoc, deleteDoc, doc, addDoc, setDoc, serverTimestamp
 } from 'firebase/firestore'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import {
     Users, Calendar, Ship, Star,
     Settings, CheckCircle, XCircle, Trash2,
     DollarSign, Loader2, Package, Image,
-    TrendingUp, BarChart3, Shield, Menu,
-    ArrowRight, Save, Plus, Edit3, ToggleLeft, ToggleRight
+    TrendingUp, BarChart3, Shield, CloudUpload,
+    Save, Plus, Edit3, ToggleLeft, ToggleRight, AlertCircle
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -28,7 +21,112 @@ const S = {
     btn: "p-3 rounded-2xl transition-all flex items-center justify-center gap-2 font-bold",
     input: "w-full bg-navy-950 border border-white/10 rounded-2xl p-4 text-white outline-none focus:ring-2 focus:ring-teal-500",
     th: "px-10 py-6 text-[10px] font-black uppercase tracking-widest text-navy-500 border-b border-white/5 text-left",
-    td: "px-10 py-8 border-b border-white/5"
+}
+
+// ── Admin Gallery Upload Component ──
+const AdminGalleryUpload = ({ db, storage, profile }) => {
+    const [file, setFile] = useState(null)
+    const [preview, setPreview] = useState(null)
+    const [caption, setCaption] = useState('')
+    const [category, setCategory] = useState('General')
+    const [progress, setProgress] = useState(0)
+    const [status, setStatus] = useState('idle')
+    const fileRef = useRef(null)
+
+    const categories = ['General', 'Sunrise & Sunset', 'Wildlife', 'Adventure', 'Group Trips', 'Landscape']
+
+    const handleFile = (e) => {
+        const f = e.target.files[0]
+        if (!f || !f.type.startsWith('image/')) return
+        setFile(f)
+        setPreview(URL.createObjectURL(f))
+    }
+
+    const handleUpload = async () => {
+        if (!file || !storage || !db) return
+        setStatus('uploading')
+
+        try {
+            const path = `gallery/admin_${Date.now()}_${file.name}`
+            const storageRef = ref(storage, path)
+            const task = uploadBytesResumable(storageRef, file)
+
+            task.on('state_changed',
+                (snap) => setProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
+                (err) => { setStatus('error'); alert(err.message) },
+                async () => {
+                    const url = await getDownloadURL(task.snapshot.ref)
+                    await addDoc(collection(db, 'gallery'), {
+                        userId: profile?.id || 'admin',
+                        userName: profile?.name || 'Admin',
+                        imageUrl: url,
+                        caption,
+                        category,
+                        approved: true, // Auto-approved for admins
+                        createdAt: serverTimestamp()
+                    })
+                    setStatus('idle')
+                    setFile(null); setPreview(null); setCaption('')
+                }
+            )
+        } catch (err) {
+            setStatus('error')
+            alert(err.message)
+        }
+    }
+
+    return (
+        <div className="flex flex-col md:flex-row gap-6">
+            {/* Dropzone / Preview */}
+            <div className="flex-1">
+                {!preview ? (
+                    <div
+                        onClick={() => fileRef.current?.click()}
+                        className="border-2 border-dashed border-white/10 hover:border-teal-500/50 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all h-full min-h-[200px]"
+                    >
+                        <CloudUpload className="text-teal-400 mb-2" size={32} />
+                        <p className="font-bold text-sm text-center">Click to select photo</p>
+                    </div>
+                ) : (
+                    <div className="relative rounded-2xl overflow-hidden aspect-video">
+                        <img src={preview} className="w-full h-full object-cover" alt="Preview" />
+                        <button onClick={() => { setFile(null); setPreview(null) }} className="absolute top-2 right-2 p-2 bg-black/60 rounded-xl text-white hover:bg-red-500">
+                            <X size={16} />
+                        </button>
+                        {status === 'uploading' && (
+                            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                                <Loader2 className="animate-spin text-teal-400 mb-2" size={24} />
+                                <p className="font-bold">{progress}%</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+                <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
+            </div>
+
+            {/* Form */}
+            <div className="flex-1 space-y-4">
+                <div>
+                    <label className="text-[10px] font-black uppercase text-navy-500 mb-2 block tracking-widest">Image Caption</label>
+                    <input type="text" placeholder="Enter caption" value={caption} onChange={e => setCaption(e.target.value)} className={S.input} />
+                </div>
+                <div>
+                    <label className="text-[10px] font-black uppercase text-navy-500 mb-2 block tracking-widest">Category</label>
+                    <select value={category} onChange={e => setCategory(e.target.value)} className={S.input}>
+                        {categories.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                </div>
+                <button
+                    onClick={handleUpload}
+                    disabled={!file || status === 'uploading'}
+                    className="w-full btn-primary py-4 mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                    {status === 'uploading' ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                    {status === 'uploading' ? 'Uploading...' : 'Publish Image'}
+                </button>
+            </div>
+        </div>
+    )
 }
 
 const Admin = () => {
@@ -462,29 +560,63 @@ const Admin = () => {
                         </motion.div>
                     )}
 
+
                     {/* Gallery Tab */}
                     {activeTab === 'gallery' && (
-                        <motion.div key="gallery" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={S.card}>
-                            <h3 className="text-2xl font-bold mb-8 flex items-center gap-3"><Image className="text-teal-400" /> Gallery Moderation</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {data.gallery.map(img => (
-                                    <div key={img.id} className="relative group rounded-3xl overflow-hidden bg-white/5 border border-white/5 aspect-square">
-                                        <img src={img.imageUrl} alt={img.caption} className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-navy-950/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 gap-4">
-                                            <p className="text-[10px] font-black uppercase text-navy-400 mb-2">BY {img.userName}</p>
-                                            {!img.approved && (
-                                                <button onClick={() => updateDoc(doc(db, 'gallery', img.id), { approved: true })} className="w-full btn-primary py-3 text-xs flex items-center justify-center gap-2">
-                                                    <CheckCircle size={14} /> Approve Photo
-                                                </button>
-                                            )}
-                                            <button onClick={() => handleDelete('gallery', img.id)} className="w-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl text-xs flex items-center justify-center gap-2 font-bold transition-all">
-                                                <Trash2 size={14} /> Delete
-                                            </button>
-                                        </div>
-                                        {!img.approved && <div className="absolute top-4 left-4 bg-orange-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-lg uppercase tracking-widest">Pending</div>}
+                        <motion.div key="gallery" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                            {/* Upload Panel */}
+                            <div className={`${S.card} border-teal-500/10`}>
+                                <h3 className="text-2xl font-bold mb-6 flex items-center gap-3"><CloudUpload className="text-teal-400" /> Admin Upload</h3>
+                                <AdminGalleryUpload db={db} storage={storage} profile={profile} />
+                            </div>
+
+                            {/* Moderation Grid */}
+                            <div className={S.card}>
+                                <div className="flex items-center justify-between mb-8">
+                                    <h3 className="text-2xl font-bold flex items-center gap-3"><Image className="text-teal-400" /> Image Library ({data.gallery.length})</h3>
+                                    <div className="flex gap-3 text-xs font-bold">
+                                        <span className="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full">
+                                            {data.gallery.filter(g => !g.approved).length} Pending
+                                        </span>
+                                        <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full">
+                                            {data.gallery.filter(g => g.approved).length} Approved
+                                        </span>
                                     </div>
-                                ))}
-                                {data.gallery.length === 0 && <p className="col-span-full text-center text-navy-500 py-20 font-bold">No images found in the gallery.</p>}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                    {data.gallery.map(img => (
+                                        <div key={img.id} className="relative group rounded-2xl overflow-hidden bg-white/5 border border-white/5 aspect-square">
+                                            <img src={img.imageUrl} alt={img.caption} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                            <div className="absolute inset-0 bg-navy-950/85 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-3">
+                                                <p className="text-[10px] font-black text-navy-400 uppercase text-center truncate w-full">by {img.userName}</p>
+                                                {!img.approved && (
+                                                    <button
+                                                        onClick={() => updateDoc(doc(db, 'gallery', img.id), { approved: true })}
+                                                        className="w-full btn-primary py-2 text-xs flex items-center justify-center gap-1"
+                                                    >
+                                                        <CheckCircle size={12} /> Approve
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDelete('gallery', img.id)}
+                                                    className="w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white py-2 rounded-xl text-xs flex items-center justify-center gap-1 font-bold transition-all"
+                                                >
+                                                    <Trash2 size={12} /> Delete
+                                                </button>
+                                            </div>
+                                            {/* Status badge */}
+                                            <div className={`absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ${img.approved ? 'bg-green-500/80 text-white' : 'bg-orange-500 text-white'}`}>
+                                                {img.approved ? '✓' : 'Pending'}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {data.gallery.length === 0 && (
+                                        <div className="col-span-full text-center py-20 text-navy-500 font-bold">
+                                            <Image size={40} className="mx-auto mb-4 opacity-30" />
+                                            No images uploaded yet
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     )}
