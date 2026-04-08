@@ -31,14 +31,20 @@ const Gallery = () => {
             setLoading(false)
             return
         }
-        const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'))
+        // Public query: Only show approved photos
+        const q = query(
+            collection(db, 'gallery'),
+            orderBy('createdAt', 'desc')
+        )
         const unsub = onSnapshot(q, (snap) => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            const list = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(img => img.approved === true || profile?.role === 'admin') // Admins see all for moderation
             setImages(list)
             setLoading(false)
         })
         return () => unsub()
-    }, [])
+    }, [profile])
 
     const handleFileChange = (e) => {
         const selected = e.target.files[0]
@@ -65,6 +71,7 @@ const Gallery = () => {
                 userName: profile?.name || 'Explorer',
                 imageUrl: downloadUrl,
                 caption,
+                approved: profile?.role === 'admin', // Auto-approve if admin uploads
                 createdAt: serverTimestamp()
             })
 

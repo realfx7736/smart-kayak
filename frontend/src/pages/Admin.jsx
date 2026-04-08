@@ -42,6 +42,7 @@ const Admin = () => {
         kayaks: [],
         reviews: [],
         packages: [],
+        gallery: [],
         settings: {}
     })
     const [stats, setStats] = useState({ revenue: 0, activeBookings: 0, totalUsers: 0, avgRating: 0 })
@@ -96,12 +97,16 @@ const Admin = () => {
             }
         })
 
+        const unsubG = onSnapshot(query(collection(db, 'gallery'), orderBy('createdAt', 'desc')), (snap) => {
+            setData(prev => ({ ...prev, gallery: snap.docs.map(d => ({ id: d.id, ...d.data() })) }))
+        })
+
         const unsubS = onSnapshot(doc(db, 'settings', 'platform'), (snap) => {
             if (snap.exists()) setData(prev => ({ ...prev, settings: snap.data() }))
         })
 
         return () => {
-            unsubB(); unsubU(); unsubP(); unsubK(); unsubR(); unsubS();
+            unsubB(); unsubU(); unsubP(); unsubK(); unsubR(); unsubG(); unsubS();
         }
     }, [])
 
@@ -150,6 +155,7 @@ const Admin = () => {
         { id: 'packages', label: 'Packages', icon: <Package className="w-5 h-5" /> },
         { id: 'users', label: 'Users', icon: <Users className="w-5 h-5" /> },
         { id: 'fleet', label: 'Fleet', icon: <Ship className="w-5 h-5" /> },
+        { id: 'gallery', label: 'Gallery', icon: <Image className="w-5 h-5" /> },
         { id: 'reviews', label: 'Reviews', icon: <Star className="w-5 h-5" /> },
         { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
     ]
@@ -452,6 +458,33 @@ const Admin = () => {
                                         <span className="font-bold text-navy-500 group-hover:text-white transition-all">Add Vessel to Fleet</span>
                                     </button>
                                 </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Gallery Tab */}
+                    {activeTab === 'gallery' && (
+                        <motion.div key="gallery" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={S.card}>
+                            <h3 className="text-2xl font-bold mb-8 flex items-center gap-3"><Image className="text-teal-400" /> Gallery Moderation</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {data.gallery.map(img => (
+                                    <div key={img.id} className="relative group rounded-3xl overflow-hidden bg-white/5 border border-white/5 aspect-square">
+                                        <img src={img.imageUrl} alt={img.caption} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-navy-950/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 gap-4">
+                                            <p className="text-[10px] font-black uppercase text-navy-400 mb-2">BY {img.userName}</p>
+                                            {!img.approved && (
+                                                <button onClick={() => updateDoc(doc(db, 'gallery', img.id), { approved: true })} className="w-full btn-primary py-3 text-xs flex items-center justify-center gap-2">
+                                                    <CheckCircle size={14} /> Approve Photo
+                                                </button>
+                                            )}
+                                            <button onClick={() => handleDelete('gallery', img.id)} className="w-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-3 rounded-xl text-xs flex items-center justify-center gap-2 font-bold transition-all">
+                                                <Trash2 size={14} /> Delete
+                                            </button>
+                                        </div>
+                                        {!img.approved && <div className="absolute top-4 left-4 bg-orange-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-lg uppercase tracking-widest">Pending</div>}
+                                    </div>
+                                ))}
+                                {data.gallery.length === 0 && <p className="col-span-full text-center text-navy-500 py-20 font-bold">No images found in the gallery.</p>}
                             </div>
                         </motion.div>
                     )}
