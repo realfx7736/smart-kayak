@@ -10,6 +10,7 @@ import {
     deleteDoc,
     doc,
     addDoc,
+    setDoc,
     serverTimestamp
 } from 'firebase/firestore'
 import {
@@ -17,7 +18,7 @@ import {
     Settings, CheckCircle, XCircle, Trash2,
     DollarSign, Loader2, Package, Image,
     TrendingUp, BarChart3, Shield, Menu,
-    ArrowRight, Save, Plus, Edit3
+    ArrowRight, Save, Plus, Edit3, ToggleLeft, ToggleRight
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -95,8 +96,12 @@ const Admin = () => {
             }
         })
 
+        const unsubS = onSnapshot(doc(db, 'settings', 'platform'), (snap) => {
+            if (snap.exists()) setData(prev => ({ ...prev, settings: snap.data() }))
+        })
+
         return () => {
-            unsubB(); unsubU(); unsubP(); unsubK(); unsubR();
+            unsubB(); unsubU(); unsubP(); unsubK(); unsubR(); unsubS();
         }
     }, [])
 
@@ -109,6 +114,13 @@ const Admin = () => {
         if (window.confirm('Are you sure you want to delete this?')) {
             await deleteDoc(doc(db, coll, id))
         }
+    }
+
+    const handleUpdateSettings = async (updates) => {
+        try {
+            const ref = doc(db, 'settings', 'platform')
+            await setDoc(ref, { ...data.settings, ...updates, updatedAt: serverTimestamp() }, { merge: true })
+        } catch (err) { alert(err.message) }
     }
 
     const handleSavePackage = async (e) => {
@@ -453,25 +465,46 @@ const Admin = () => {
                                         <h4 className="text-sm font-black text-navy-500 uppercase tracking-widest border-b border-white/5 pb-2">Website Banner</h4>
                                         <div>
                                             <label className="text-xs text-navy-400 mb-2 block">Promotional Text</label>
-                                            <input type="text" placeholder="e.g. 20% Off for Summer!" className={S.input} />
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. 20% Off for Summer!"
+                                                className={S.input}
+                                                value={data.settings?.bannerText || ''}
+                                                onChange={(e) => setData(prev => ({ ...prev, settings: { ...prev.settings, bannerText: e.target.value } }))}
+                                            />
                                         </div>
-                                        <button className="btn-primary w-full py-4 text-sm">Update Banner</button>
+                                        <button
+                                            onClick={() => handleUpdateSettings({ bannerText: data.settings.bannerText })}
+                                            className="btn-primary w-full py-4 text-sm"
+                                        >
+                                            Update Banner
+                                        </button>
                                     </div>
                                     <div className="space-y-6">
                                         <h4 className="text-sm font-black text-navy-500 uppercase tracking-widest border-b border-white/5 pb-2">Safety & Operations</h4>
                                         <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
                                             <div>
-                                                <p className="font-bold">Global SOS Alerts</p>
+                                                <p className="font-bold text-red-400">Global SOS Alerts</p>
                                                 <p className="text-[10px] text-navy-500 font-bold uppercase">Toggle emergency banners site-wide</p>
                                             </div>
-                                            <button className="p-3 bg-red-500/10 text-red-500 rounded-full"><ToggleLeft size={24} /></button>
+                                            <button
+                                                onClick={() => handleUpdateSettings({ sosEnabled: !data.settings?.sosEnabled })}
+                                                className={`p-3 rounded-full transition-all ${data.settings?.sosEnabled ? 'bg-red-500 text-white' : 'bg-navy-800 text-navy-500'}`}
+                                            >
+                                                {data.settings?.sosEnabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                                            </button>
                                         </div>
                                         <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
                                             <div>
                                                 <p className="font-bold">Maintenance Mode</p>
                                                 <p className="text-[10px] text-navy-500 font-bold uppercase">Restrict bookings for system updates</p>
                                             </div>
-                                            <button className="p-3 bg-navy-800 text-navy-500 rounded-full"><ToggleLeft size={24} /></button>
+                                            <button
+                                                onClick={() => handleUpdateSettings({ maintenanceMode: !data.settings?.maintenanceMode })}
+                                                className={`p-3 rounded-full transition-all ${data.settings?.maintenanceMode ? 'bg-teal-500 text-white' : 'bg-navy-800 text-navy-500'}`}
+                                            >
+                                                {data.settings?.maintenanceMode ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
