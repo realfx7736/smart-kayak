@@ -28,6 +28,10 @@ const Booking = () => {
     const slots = ['06:00 AM', '08:00 AM', '10:00 AM', '02:00 PM', '04:00 PM', '05:30 PM']
 
     useEffect(() => {
+        if (!db) {
+            setLoading(false)
+            return
+        }
         const fetchPackages = async () => {
             const q = query(collection(db, 'packages'), orderBy('price', 'asc'))
             const snap = await getDocs(q)

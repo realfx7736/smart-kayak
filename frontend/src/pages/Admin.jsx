@@ -37,6 +37,10 @@ const Admin = () => {
     }, [profile, navigate])
 
     useEffect(() => {
+        if (!db) {
+            setLoading(false)
+            return
+        }
         setLoading(true)
 
         // Listeners for real-time updates

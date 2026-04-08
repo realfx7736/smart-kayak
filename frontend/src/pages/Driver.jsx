@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/firebase'
+import {
+    collection,
+    onSnapshot,
+    doc,
+    updateDoc,
+    addDoc,
+    serverTimestamp
+} from 'firebase/firestore'
 import { useAuth } from '../context/AuthContext'
 import { MapPin, Navigation, ToggleLeft, ToggleRight, Loader2, Ship, AlertCircle } from 'lucide-react'
 
@@ -12,40 +20,41 @@ const DriverMode = () => {
     const [error, setError] = useState(null)
 
     useEffect(() => {
-        const fetchMyKayaks = async () => {
-            const { data } = await supabase.from('kayaks').select('*')
-            if (data) setKayaks(data)
-        }
-        fetchMyKayaks()
+        if (!db) return
+        const unsubscribe = onSnapshot(collection(db, 'kayaks'), (snap) => {
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            setKayaks(list)
+        })
+        return () => unsubscribe()
     }, [])
 
     useEffect(() => {
         let watchId;
-        if (isTracking && kayakId) {
+        if (isTracking && kayakId && db) {
             watchId = navigator.geolocation.watchPosition(
                 async (pos) => {
                     const { latitude, longitude } = pos.coords
                     setLocation({ lat: latitude, lng: longitude })
 
-                    // Update Kayak Location
-                    await supabase
-                        .from('kayaks')
-                        .update({
-                            last_known_lat: latitude,
-                            last_known_lng: longitude,
+                    try {
+                        const kayakRef = doc(db, 'kayaks', kayakId)
+                        await updateDoc(kayakRef, {
+                            lastKnownLat: latitude,
+                            lastKnownLng: longitude,
                             status: 'in-use',
-                            updated_at: new Date()
+                            updatedAt: serverTimestamp()
                         })
-                        .eq('id', kayakId)
 
-                    // Optional: Historical tracking
-                    await supabase
-                        .from('tracking')
-                        .insert({
-                            kayak_id: kayakId,
+                        // Log history
+                        await addDoc(collection(db, 'tracking_logs'), {
+                            kayakId,
                             latitude,
-                            longitude
+                            longitude,
+                            timestamp: serverTimestamp()
                         })
+                    } catch (err) {
+                        console.error('Update failed:', err)
+                    }
                 },
                 (err) => setError(err.message),
                 { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
@@ -76,7 +85,7 @@ const DriverMode = () => {
                             value={kayakId}
                             onChange={(e) => setKayakId(e.target.value)}
                             disabled={isTracking}
-                            className="w-full bg-navy-950/50 border border-white/10 rounded-2xl p-5 text-white outline-none focus:ring-2 focus:ring-teal-500 appearance-none"
+                            className="w-full bg-navy-950/50 border border-white/10 rounded-2xl p-5 text-white outline-none appearance-none"
                         >
                             <option value="">Choose a Kayak...</option>
                             {kayaks.map(k => (
@@ -98,7 +107,7 @@ const DriverMode = () => {
                             </div>
                             <button
                                 onClick={() => setIsTracking(!isTracking)}
-                                disabled={!kayakId}
+                                disabled={!kayakId || !db}
                                 className={`p-4 rounded-full transition-all ${isTracking ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'bg-teal-500 text-white shadow-lg shadow-teal-500/20'} disabled:opacity-30`}
                             >
                                 {isTracking ? <ToggleRight className="w-10 h-10" /> : <ToggleLeft className="w-10 h-10" />}

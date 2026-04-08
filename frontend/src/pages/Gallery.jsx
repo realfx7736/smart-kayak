@@ -27,6 +27,10 @@ const Gallery = () => {
     const { user, profile } = useAuth()
 
     useEffect(() => {
+        if (!db) {
+            setLoading(false)
+            return
+        }
         const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'))
         const unsub = onSnapshot(q, (snap) => {
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -45,7 +49,7 @@ const Gallery = () => {
     }
 
     const handleUpload = async () => {
-        if (!file || !user) return
+        if (!file || !user || !db || !storage) return
         setUploading(true)
         try {
             const filePath = `gallery/${user.uid}/${Date.now()}_${file.name}`
