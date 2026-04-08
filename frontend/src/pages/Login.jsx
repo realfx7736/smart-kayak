@@ -12,7 +12,7 @@ import {
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
-import { Phone, Compass, ArrowLeft, Loader2, Lock, User, AtSign } from 'lucide-react'
+import { Phone, Compass, ArrowLeft, Loader2, Lock, User, AtSign, Shield } from 'lucide-react'
 
 const Login = () => {
     const [isSignUp, setIsSignUp] = useState(false)
@@ -77,6 +77,7 @@ const Login = () => {
                 // FALLBACK: Demo Bypass for Master Admin (Local Dev only)
                 if (formData.email === 'admin@smartkuttanad.com' && formData.password === 'admin123') {
                     console.warn('⚠️ Firebase not connected. Entering Demo Admin Mode.');
+                    sessionStorage.setItem('demoAdmin', 'true');
                     navigate('/admin');
                     return;
                 }
